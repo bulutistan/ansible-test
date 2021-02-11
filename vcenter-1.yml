@@ -1,0 +1,22 @@
+---
+- name: List available PowerVC Images
+  hosts: localhost
+  tasks:
+    - name: Clone the template
+      vmware_guest:
+        name: testvm_ulti2
+        template: testvm_2
+        datacenter: Datacenter-13
+        folder: /
+        state: poweredon
+        wait_for_ip_address: no
+        networks:
+        - name: VM Network
+          ip: 10.10.10.10
+          netmask: 255.255.255.0
+          gateway: 10.10.10.1
+          dns_servers:
+          - 10.10.10.1
+          - 10.10.10.2
+          type: static
+          start_connected: True
