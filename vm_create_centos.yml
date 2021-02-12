@@ -1,0 +1,98 @@
+---
+- name: Create a VM from a template
+  hosts: localhost
+  connection: local
+  gather_facts: no
+    
+  tasks:
+    - name: Clone the template
+      vmware_guest:
+        name: "{{ vm_name }}"
+        template: "{{ template_name }}"
+        datacenter: "{{ vc_datacenter }}"
+        folder: "{{ vc_folder }}"
+        state: poweredon
+        wait_for_ip_address: no
+        customization: "{{ vm_customization }}"
+        networks: "{{ vm_networks }}"
+        disk:
+        - size_gb: 30
+          type: thin
+          datastore: datastore1
+        hardware:
+          memory_mb: 2048
+          num_cpus: 4
+          num_cpu_cores_per_socket: 2
+    
+    - name: Wait 1 minute
+      wait_for:
+        delay: 60
+        timeout: 0
+
+    - name: Disable Cloud Init
+      vmware_vm_shell:
+        datacenter: "{{ vc_datacenter }}"
+        folder: "{{ vc_folder }}"
+        vm_id: "{{ vm_name }}"
+        vm_username: "{{ template_user }}"
+        vm_password: "{{ template_password }}"
+        vm_shell: /bin/sudo
+        vm_shell_args: " /bin/touch /etc/cloud/cloud-init.disabled"
+        vm_shell_env:
+          - "PATH=/bin"
+        vm_shell_cwd: "/etc/cloud"
+        wait_for_process: False
+      delegate_to: localhost
+      register: shell_command_output
+    
+    - name: Wait 10 second
+      wait_for:
+        delay: 10
+        timeout: 0
+
+    - name: Put hostname
+      vmware_vm_shell:
+        datacenter: "{{ vc_datacenter }}"
+        folder: "{{ vc_folder }}"
+        vm_id: "{{ vm_name }}"
+        vm_username: "{{ template_user }}"
+        vm_password: "{{ template_password }}"
+        vm_shell: /bin/hostnamectl
+        vm_shell_args: " set-hostname {{ vm_hostname }}"
+        vm_shell_env:
+          - "PATH=/bin"
+        vm_shell_cwd: "/tmp"
+        wait_for_process: False
+      delegate_to: localhost
+      register: shell_command_output
+    
+    - name: Wait 10 second
+      wait_for:
+        delay: 10
+        timeout: 0
+
+    - name: Change root password
+      vmware_vm_shell:
+        datacenter: "{{ vc_datacenter }}"
+        folder: "{{ vc_folder }}"
+        vm_id: "{{ vm_name }}"
+        vm_username: "{{ template_user }}"
+        vm_password: "{{ template_password }}"
+        vm_shell: /bin/echo
+        vm_shell_args: " '{{ vm_password }}' | /bin/passwd --stdin root"
+        vm_shell_env:
+          - "PATH=/bin"
+        vm_shell_cwd: "/tmp"
+        wait_for_process: False
+      delegate_to: localhost
+      register: shell_command_output
+    
+    - name: Wait 10 second
+      wait_for:
+        delay: 10
+        timeout: 0
+
+    - name: Reboot Machine
+      vmware_guest:
+        name: "{{ vm_name }}"
+        state: reboot-guest
